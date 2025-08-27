@@ -1,0 +1,39 @@
+# docker/docker-compose.yml
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/client_success_db
+      - ENVIRONMENT=development
+    volumes:
+      - ../app:/app/app
+      - ../nlp_pipeline:/app/nlp_pipeline
+      - ../scripts:/app/scripts
+    depends_on:
+      - mongo
+    networks:
+      - triage-network
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=client_success_db
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - triage-network
+
+networks:
+  triage-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
