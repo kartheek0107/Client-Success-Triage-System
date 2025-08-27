@@ -18,9 +18,10 @@ def read_root():
         db_status = f"failed: {str(e)}"
         
     return {
-        "message":"Client Success Triage system is reunning!!!!!",
+        "message": "Client Success Triage system is running!",  # Fixed: typo
         "environment": settings.ENVIRONMENT,
-        "database": settings.MONGO_URI
+        "database_status": db_status,  # Fixed: show actual status, not URI for security
+        "version": settings.API_VERSION
     }
 
 @app.get("/health")
@@ -29,9 +30,16 @@ def health_check():
 
 @app.on_event("startup")
 def startup_event():
-    db = get_db()
+    """Initialize database connection on startup."""
+    try:
+        db = get_db()
+        print(f"Connected to MongoDB: {settings.ENVIRONMENT}")
+    except Exception as e:
+        print(f"Failed to connect to MongoDB: {e}")
 
 @app.on_event("shutdown")
 def shutdown_event():
+    """Clean up database connections on shutdown."""
     from app.db.mongo import close_db
     close_db()
+    print("Database connections closed")

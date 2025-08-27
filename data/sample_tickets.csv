@@ -1,0 +1,16 @@
+subject,description,priority,category
+"API not responding","Our integration has stopped receiving data. No errors in logs. This started 2 hours ago.",Critical,Technical
+"Login failure","Users cannot log in after recent update. Getting 'invalid credentials' even with correct password.",High,Technical
+"Invoice overcharge","I was charged twice for last month's subscription. Please refund the extra $49.",High,Billing
+"Feature request: export data","Please add a CSV export option for user reports.",Low,Feature Request
+"Account locked","My account was locked without warning. Need access restored ASAP.",Medium,Account
+"Webhook timeout","Webhooks are taking over 10 seconds to deliver. Causing sync issues.",High,Technical
+"Cancel subscription","I want to cancel my plan and delete my data.",Medium,Billing
+"UI bug: dashboard chart","The monthly usage chart shows wrong data after the update.",Low,Technical
+"Need API rate limit increase","Our app hits 1000+ requests/min. Current limit is blocking us.",Critical,Technical
+"Missing invoice","I haven't received the invoice for this month. Please resend.",Low,Billing
+"SSO setup help","Need assistance setting up SSO with Okta.",Medium,Account
+"Data export failed","Export button returns empty file.",High,Technical
+"Upgrade plan","I want to upgrade to Enterprise tier.",Low,Account
+"Documentation error","API docs show wrong endpoint for /v2/users.",Low,Feature Request
+"Service outage","Your status page shows all green but our service is down.",Critical,Technical
