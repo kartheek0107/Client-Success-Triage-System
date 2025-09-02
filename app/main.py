@@ -1,14 +1,22 @@
-from fastapi import FastAPI, HTTPException, Depends
-from pydantic import BaseModel
-from typing import Dict
+# app/main.py
+from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.middleware.cors import CORSMiddleware  # Optional
+from slowapi import _rate_limit_exceeded_handler, Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
-# Import configuration and DB
+# Import config, db, classifier
 from app.core.config import settings
 from app.db.mongo import get_db, close_db
-
-# Import BERT classifier
 from nlp_pipeline.models.bert_classifier import BERTTicketClassifier
 
+# Security
+from app.api.v1.auth import get_api_key
+from app.api.v1.rate_limiter import limiter
+
+# Models
+from pydantic import BaseModel
+from typing import Dict
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -17,13 +25,25 @@ app = FastAPI(
     description="AI-powered ticket classification system for client success teams."
 )
 
+# Add rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Global variable to hold the classifier
+# CORS (optional, if calling from frontend)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Change in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Global classifier
 classifier: BERTTicketClassifier
 
 
 # -------------------------------
-# Pydantic Models for API
+# Models
 # -------------------------------
 class ClassifyRequest(BaseModel):
     subject: str
@@ -38,23 +58,19 @@ class ClassificationResponse(BaseModel):
 
 
 # -------------------------------
-# Startup & Shutdown Events
+# Startup & Shutdown
 # -------------------------------
 @app.on_event("startup")
 def startup_event():
-    """Initialize database and load BERT classifier on startup."""
     global classifier
     try:
-        # Initialize DB
         db = get_db()
         db.client.admin.command("ping")
         print("✅ Connected to MongoDB")
 
-        # Load BERT classifier
-        print("🧠 Loading BERT ticket classifier...")
+        print("🧠 Loading BERT classifier...")
         classifier = BERTTicketClassifier()
-        print("✅ BERT classifier loaded successfully")
-
+        print("✅ BERT classifier loaded")
     except Exception as e:
         print(f"❌ Startup failed: {e}")
         raise
@@ -62,17 +78,15 @@ def startup_event():
 
 @app.on_event("shutdown")
 def shutdown_event():
-    """Clean up database connections."""
     close_db()
-    print("💤 Database connections closed")
+    print("💤 DB connections closed")
 
 
 # -------------------------------
-# API Endpoints
+# Public Health Endpoints (No Auth)
 # -------------------------------
 @app.get("/")
 def read_root():
-    """Health and status endpoint."""
     try:
         db = get_db()
         db.client.admin.command("ping")
@@ -91,19 +105,29 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    """Simple health check."""
     return {"status": "healthy"}
 
 
+# -------------------------------
+# Secure Classification Endpoint
+# -------------------------------
+
+class ClassifyRequest(BaseModel):
+    subject: str
+    description: str
+
 @app.post("/classify", response_model=ClassificationResponse)
-def classify_ticket(request: ClassifyRequest) -> Dict:
+@limiter.limit("10/minute") 
+def classify_ticket(
+    request: Request,
+    body: ClassifyRequest,
+    api_key: str = Depends(get_api_key)
+):
     """
-    Classify a support ticket based on subject and description.
-    
-    Returns predicted priority and category with confidence scores.
+    Classify a ticket using BERT. Protected by API key and rate limiting.
     """
     try:
-        result = classifier.classify(request.subject, request.description)
+        result = classifier.classify(body.subject, body.description)
         return result
     except Exception as e:
         raise HTTPException(
