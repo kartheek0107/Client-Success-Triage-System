@@ -13,7 +13,7 @@ st.title("🎫 Client Success Ticket Triage System")
 st.markdown("AI-powered classification of support tickets by **priority** and **category**.")
 
 # Configuration
-API_URL = "http://localhost:8000/classify"
+API_URL = "https://client-success-triage-system.onrender.com"
 API_KEY = "your-secret-api-key-here-keep-it-safe"
 
 # Test API connection
