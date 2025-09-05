@@ -70,18 +70,33 @@ class ClassificationResponse(BaseModel):
 @app.on_event("startup")
 def startup_event():
     global classifier
+    
+    # Try MongoDB connection
+    mongodb_available = False
     try:
         db = get_db()
         db.client.admin.command("ping")
         print("✅ Connected to MongoDB")
+        mongodb_available = True
+    except Exception as e:
+        print(f"⚠️  MongoDB connection failed: {e}")
+        if settings.REQUIRE_MONGODB:
+            print("❌ MongoDB is required but unavailable. Exiting.")
+            raise
+        else:
+            print("🔄 Continuing without MongoDB (ticket saving disabled)")
 
+    # Load classifier (this should work regardless of MongoDB)
+    try:
         print("🧠 Loading BERT ticket classifier...")
         classifier = BERTTicketClassifier()
         print("✅ BERT classifier loaded successfully")
     except Exception as e:
-        print(f"❌ Startup failed: {e}")
+        print(f"❌ Classifier loading failed: {e}")
         raise
-
+    
+    # Store MongoDB status globally
+    app.state.mongodb_available = mongodb_available
 
 @app.on_event("shutdown")
 def shutdown_event():
@@ -152,10 +167,13 @@ def save_ticket(
     ticket: ClassifiedTicketCreate,
     api_key: str = Depends(get_api_key)
 ):
-    """
-    Save a classified ticket to MongoDB.
-    Used by Streamlit dashboard to persist results.
-    """
+    """Save a classified ticket to MongoDB (if available)."""
+    if not getattr(app.state, 'mongodb_available', False):
+        raise HTTPException(
+            status_code=503,
+            detail="Database unavailable - ticket classification works but saving is disabled"
+        )
+    
     try:
         db = get_db()
         collection = db["classified_tickets"]
@@ -163,5 +181,3 @@ def save_ticket(
         return {"status": "saved", "inserted_id": str(result.inserted_id)}
     except PyMongoError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Save failed: {str(e)}")

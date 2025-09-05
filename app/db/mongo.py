@@ -13,13 +13,12 @@ def get_client() -> MongoClient:  # Fixed: MongoClient spelling
         _client = MongoClient(settings.MONGO_URI)  # Fixed: settings spelling
     return _client
 
-def get_db() -> Database:
-    """Get MongoDB database instance."""
-    global _db
-    if _db is None:
-        client = get_client()
-        _db = client.get_database()
-    return _db
+def get_db():
+    # Extract database name from URI or use a default
+    from urllib.parse import urlparse
+    parsed = urlparse(settings.MONGO_URI)
+    db_name = parsed.path.strip("/") or "client_success_db"
+    return _client[db_name]  # ← This is the fix
 
 def close_db():
     """Close MongoDB connection."""
